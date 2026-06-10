@@ -1,13 +1,10 @@
-// Cole aqui as credenciais do seu Firebase.
-// Firebase Console > Project settings > Your apps > Web app > SDK setup
-
 export const firebaseConfig = {
-  apiKey: "COLE_AQUI",
-  authDomain: "COLE_AQUI.firebaseapp.com",
-  projectId: "COLE_AQUI",
-  storageBucket: "COLE_AQUI.appspot.com",
-  messagingSenderId: "COLE_AQUI",
-  appId: "COLE_AQUI"
+  apiKey: "AIzaSyBBCi3g-UtSlJ7yJIBsBjI37QTmQTmzhy8",
+  authDomain: "painel-the-first-defense.firebaseapp.com",
+  projectId: "painel-the-first-defense",
+  storageBucket: "painel-the-first-defense.firebasestorage.app",
+  messagingSenderId: "846520352777",
+  appId: "1:846520352777:web:235ba93be8907ca99bb8d8"
 };
 
-export const MASTER_EMAIL = "seu-email-de-mestre@email.com";
+export const MASTER_EMAIL = "contato.vitortharles@gmail.com";
