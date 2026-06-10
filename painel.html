@@ -928,13 +928,14 @@ update();
 </script>
 
 
+
 <script>
-/* CORREÇÃO FOTO/FIRESTORE:
-   Fotos grandes em base64 podem ultrapassar o limite do Firestore.
-   Esta correção comprime automaticamente a foto antes de salvar. */
+/* CORREÇÃO DEFINITIVA FOTO/FIRESTORE:
+   Comprime a foto de forma mais agressiva para evitar limite do Firestore. */
 (function(){
-  const MAX_SIZE = 850;
-  const QUALITY = 0.72;
+  const MAX_SIZE = 420;
+  const QUALITY = 0.58;
+  const SAFE_LIMIT = 430000;
 
   function compressDataUrl(dataUrl){
     return new Promise((resolve) => {
@@ -947,15 +948,17 @@ update();
         const canvas = document.createElement("canvas");
         canvas.width = w;
         canvas.height = h;
-        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", QUALITY));
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        let out = canvas.toDataURL("image/jpeg", QUALITY);
+        resolve(out);
       };
       img.onerror = () => resolve(dataUrl);
       img.src = dataUrl;
     });
   }
 
-  async function compressFile(file){
+  async function fileToCompressedDataUrl(file){
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = async () => resolve(await compressDataUrl(reader.result));
@@ -966,7 +969,7 @@ update();
   async function compressPortrait(){
     const portrait = document.getElementById("portrait");
     if(!portrait || !portrait.src || !portrait.src.startsWith("data:image/")) return;
-    if(portrait.src.length > 650000) {
+    if(portrait.src.length > SAFE_LIMIT) {
       portrait.src = await compressDataUrl(portrait.src);
     }
   }
@@ -974,24 +977,28 @@ update();
   window.TFD_compressPortrait = compressPortrait;
 
   window.addEventListener("load", () => {
-    const oldInput = document.getElementById("photoInput");
+    const input = document.getElementById("photoInput");
     const portrait = document.getElementById("portrait");
-    if(!oldInput || !portrait) return;
+    if(!input || !portrait) return;
 
-    const input = oldInput.cloneNode(true);
-    oldInput.parentNode.replaceChild(input, oldInput);
+    const cleanInput = input.cloneNode(true);
+    input.parentNode.replaceChild(cleanInput, input);
 
-    input.addEventListener("change", async (e) => {
+    cleanInput.addEventListener("change", async (e) => {
       const file = e.target.files && e.target.files[0];
       if(!file) return;
-      portrait.src = await compressFile(file);
-      try { if(typeof window.saveSheet === "function") window.saveSheet(false); } catch(e) {}
+
+      portrait.src = await fileToCompressedDataUrl(file);
+
+      try {
+        if(typeof window.saveSheet === "function") window.saveSheet(false);
+      } catch(e) {}
     });
   });
 
-  const oldGetData = window.getData;
+  const previousGetData = window.getData;
   window.getData = function(){
-    const data = typeof oldGetData === "function" ? oldGetData() : {};
+    const data = typeof previousGetData === "function" ? previousGetData() : {};
     const portrait = document.getElementById("portrait");
     if(portrait && portrait.src) data.portrait = portrait.src;
     return data;

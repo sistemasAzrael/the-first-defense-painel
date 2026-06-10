@@ -54,8 +54,49 @@ async function openCharacter(id) {
   frame.contentWindow.postMessage({ type: "LOAD_TFD_CHARACTER", payload: data.panelData || {} }, "*");
 }
 
+function compressDataUrl(dataUrl) {
+  return new Promise((resolve) => {
+    if (!dataUrl || !dataUrl.startsWith("data:image/")) return resolve(dataUrl);
+
+    const img = new Image();
+    img.onload = () => {
+      const maxSize = 420;
+      const quality = 0.55;
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+async function makePayloadSafe(panelData) {
+  if (!panelData) return {};
+
+  if (panelData.portrait && panelData.portrait.startsWith("data:image/")) {
+    panelData.portrait = await compressDataUrl(panelData.portrait);
+
+    // Última proteção: se ainda ficar grande demais, não deixa quebrar o salvamento.
+    if (panelData.portrait.length > 650000) {
+      alert("A foto ainda está muito pesada. O personagem será salvo sem a foto. Use uma imagem menor ou recortada.");
+      delete panelData.portrait;
+    }
+  }
+
+  return panelData;
+}
+
 document.getElementById("saveBtn").onclick = async () => {
   if (!currentCharacterId) return alert("Selecione um personagem primeiro.");
+
   frame.contentWindow.postMessage({ type: "REQUEST_TFD_EXPORT" }, "*");
 };
 
@@ -63,15 +104,21 @@ window.addEventListener("message", async (event) => {
   if (event.data?.type !== "TFD_EXPORT_DATA") return;
   if (!currentCharacterId) return;
 
-  const panelData = event.data.payload;
-  await setDoc(doc(db, "characters", currentCharacterId), {
-    name: panelData.nameInput || "Sem Nome",
-    ownerEmail: panelData.ownerEmail || currentUser.email,
-    panelData,
-    updatedAt: new Date().toISOString()
-  }, { merge: true });
+  try {
+    const panelData = await makePayloadSafe(event.data.payload || {});
 
-  alert("Personagem salvo no banco.");
+    await setDoc(doc(db, "characters", currentCharacterId), {
+      name: panelData.nameInput || "Sem Nome",
+      ownerEmail: panelData.ownerEmail || currentUser.email,
+      panelData,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    alert("Personagem salvo no banco.");
+  } catch (e) {
+    console.error(e);
+    alert("Não foi possível salvar. Provável causa: foto muito pesada ou permissão do Firestore.");
+  }
 });
 
 document.getElementById("logoutBtn").onclick = () => signOut(auth);
